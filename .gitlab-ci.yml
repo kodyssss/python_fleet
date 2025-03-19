@@ -22,7 +22,7 @@ build_image:
   image: docker:20.10 # 使用指定版本的 Docker 镜像 
   script:
     - echo "构建 Docker 镜像..."
-    - docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile docker/
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile 
     - docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
   rules:
     - if: '$CI_COMMIT_TAG' # 只在推送标签时触发
