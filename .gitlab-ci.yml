@@ -1,9 +1,12 @@
+# 引入 NeuVector GitLab 插件
+include:
+  - remote: 'https://gitlab.com/neuvector/gitlab-plugin/-/raw/master/scan.yml'
+
 # 全局变量
 variables:
-  IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo" # 自定义镜像名称 
-  #IMAGE_TAG: "$CI_COMMIT_TAG" # 使用提交的短 SHA 作为标签
-  IMAGE_TAG: "test"
-  DOCKER_AUTH_CONFIG: | # Docker 认证配置，用于登录 Harbor
+  IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo"
+  IMAGE_TAG: "$CI_COMMIT_TAG"
+  DOCKER_AUTH_CONFIG: |
     {
       "auths": {
         "harbor.kodyrepo.online": {
@@ -11,6 +14,8 @@ variables:
         }
       }
     }
+  NV_REGISTRY_USER: "admin"           # Harbor 用户名
+  NV_REGISTRY_PASSWORD: "Harbor12345" # Harbor 密码
 
 # 定义流水线阶段
 stages:
@@ -26,57 +31,33 @@ build_image:
     - echo "构建 Docker 镜像..."
     - docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile docker/
     - docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
-  #rules:
-  #  - if: '$CI_COMMIT_TAG'
+    # 导出镜像为 tar 文件供扫描使用
+    - docker save -o temp.tar $IMAGE_NAME:$IMAGE_TAG
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - temp.tar
+  rules:
+    - if: '$CI_COMMIT_TAG'
 
 # NeuVector 扫描
 neuvector_scan:
   stage: scan
-  image: docker:20.10  # 与 build 和 push 使用相同的镜像版本
-  tags:
-    - nv-scan
-  before_script:
-    - apk add curl
-    - apk add jq
   variables:
-    NV_TO_BE_SCANNED_IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo"
-    NV_TO_BE_SCANNED_IMAGE_TAG: "$CI_COMMIT_TAG"
-    NV_REGISTRY_NAME: "harbor.kodyrepo.online"
-    NV_REGISTRY_USER: "admin"
-    NV_REGISTRY_PASSWORD: "Harbor12345"
-    NV_IMAGE: "docker.io/neuvector/controller"
-    NV_PORT: 10443
-    NV_LOGIN_USER: "admin"
-    NV_LOGIN_PASSWORD: "admin"
-    NV_LOGIN_JSON: '{"password":{"username":"$NV_LOGIN_USER","password":"$NV_LOGIN_PASSWORD"}}'
-    NV_SCANNING_JSON: '{"request":{"registry":"$NV_REGISTRY_NAME","username":"$NV_REGISTRY_USER","password":"$NV_REGISTRY_PASSWORD","repository":"$NV_TO_BE_SCANNED_IMAGE_NAME","tag":"$NV_TO_BE_SCANNED_IMAGE_TAG"}}'
-    NV_API_AUTH_URL: "https://10.128.1.76:$NV_PORT/v1/auth"
-    NV_API_SCANNING_URL: "https://10.128.1.76:$NV_PORT/v1/scan/repository"
-  script: 
-    - echo "Start neuvector scanner"
-    - docker run -itd --privileged --name neuvector.controller -e CLUSTER_JOIN_ADDR=$CI_SERVER_HOST -p 18301:18301 -p 18301:18301/udp -p 18300:18300 -p 18400:18400 -p $NV_PORT:$NV_PORT -v /var/neuvector:/var/neuvector -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/host/proc:ro -v /sys/fs/cgroup/:/host/cgroup/:ro $NV_IMAGE
-    - |
-      _COUNTER_="0"
-      while [ -z "$TOKEN" -a "$_COUNTER_" != "12" ]; do
-        _COUNTER_=$((( _COUNTER_ + 1 )))
-        sleep 5
-        TOKEN=`(curl -s -f $NV_API_AUTH_URL -k -H "Content-Type:application/json" -d "$NV_LOGIN_JSON" || echo null) | jq -r '.token.token'`
-        if [ "$TOKEN" = "null" ]; then
-          TOKEN=""
-        fi
-      done
-    - echo "Scanning ..."
-    - sleep 40
-    - curl $NV_API_SCANNING_URL -s -k -H "Content-Type:application/json" -H "X-Auth-Token:$TOKEN" -d "$NV_SCANNING_JSON" | jq .
-    - echo "Logout"
-    - curl $NV_API_AUTH_URL -k -X 'DELETE' -H "Content-Type:application/json" -H "X-Auth-Token:$TOKEN"
-  after_script:
-    - docker stop neuvector.controller
-    - docker rm neuvector.controller
+    scan_local_image: "true"          # 扫描本地 tar 文件
+    image_tar: "temp.tar"             # 构建阶段导出的 tar 文件
+    image_repo: "$IMAGE_NAME"         # 镜像名称
+    image_tag: "$IMAGE_TAG"           # 镜像标签
+    nv_registry_user: "$NV_REGISTRY_USER"      # Harbor 用户名
+    nv_registry_password: "$NV_REGISTRY_PASSWORD" # Harbor 密码
+    scan_layers: "false"              # 是否扫描镜像层（关闭以加快速度）
+    high_vul_to_fail: 9               # 高危漏洞阈值，超过 9 个失败
+    medium_vul_to_fail: 10            # 中危漏洞阈值，超过 10 个失败
+    vul_names_to_fail: "CVE-2020-1971, CVE-2020-1972" # 指定失败的 CVE
   dependencies:
-    - build_image
-  #rules:
-  #  - if: '$CI_COMMIT_TAG'
+    - build_image                    # 依赖构建阶段的 tar 文件
+  rules:
+    - if: '$CI_COMMIT_TAG'
 
 # 推送镜像到 Harbor
 push_image:
@@ -86,11 +67,11 @@ push_image:
     - echo "推送镜像到 Harbor..."
     - mkdir -p ~/.docker
     - echo "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json || { echo "写入 Docker 配置失败"; exit 1; }
-    - ping -c 4 harbor.kodyrepo.online || { echo "无法连接 k8s.kodyrepo.online"; exit 1; }
+    - ping -c 4 harbor.kodyrepo.online || { echo "无法连接 harbor.kodyrepo.online"; exit 1; }
     - docker push $IMAGE_NAME:$IMAGE_TAG || { echo "推送 $IMAGE_TAG 失败"; exit 1; }
     - docker push $IMAGE_NAME:latest || { echo "推送 latest 失败"; exit 1; }
     - echo "镜像推送完成"
   dependencies:
-    - neuvector_scan
-  #rules:
-  #  - if: '$CI_COMMIT_TAG'
+    - neuvector_scan                 # 依赖扫描阶段
+  rules:
+    - if: '$CI_COMMIT_TAG'
