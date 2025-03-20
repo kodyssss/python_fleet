@@ -1,0 +1,166 @@
+neuvector_scan:
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - apk add curl
+    - apk add jq
+  variables:
+    # the flag to run local image scan
+    scan_local_image: "false"
+    # the image to be scanned
+    image_tar: ""
+    image_repo: ""
+    image_tag: ""
+    image_registry_url: ""
+    image_registry_user: ""
+    image_registry_password: ""
+    # neuvector scanner to be run on dynamic
+    nv_registry_url: ""
+    nv_registry_user: ""
+    nv_registry_password: ""
+    nv_scanner_image: "neuvector/scanner:latest"
+    # the long running restful service
+    nv_service_ip: ""
+    nv_service_port: "443"
+    nv_service_login_user: ""
+    nv_service_login_password: ""
+    # criteria
+    scan_layers: "false"
+    high_vul_to_fail: 0
+    medium_vul_to_fail: 0
+    vul_names_to_fail: ""
+
+  script:
+    # run NeuVector Scanner
+    - |
+      current_dir=$(pwd)
+      rm -rf nvreport
+      mkdir nvreport
+
+      if [ "$scan_local_image" = "true" ]; then
+
+        docker load -i $image_tar
+        echo "$nv_registry_password" | docker login -u "$nv_registry_user" $nv_registry_url --password-stdin
+        docker run --name neuvector.scanner --rm -e SCANNER_REPOSITORY=$image_repo -e SCANNER_TAG=$image_tag -e SCANNER_ON_DEMAND=true -v /var/run/docker.sock:/var/run/docker.sock -v $current_dir:/var/neuvector $nv_scanner_image
+
+        cp $current_dir/scan_result.json ./nvreport/scan-repository.json
+
+      elif [ -z "$nv_service_ip" ]; then
+
+        echo "$nv_registry_password" | docker login -u "$nv_registry_user" $nv_registry_url --password-stdin
+        docker run --name neuvector.scanner --rm -e SCANNER_REGISTRY=$image_registry_url -e SCANNER_REGISTRY_USERNAME=$image_registry_user -e SCANNER_REGISTRY_PASSWORD=$image_registry_password -e SCANNER_REPOSITORY=$image_repo -e SCANNER_TAG=$image_tag -e SCANNER_ON_DEMAND=true -v /var/run/docker.sock:/var/run/docker.sock -v $current_dir:/var/neuvector $nv_scanner_image
+
+        cp $current_dir/scan_result.json ./nvreport/scan-repository.json
+
+      else
+        rm -rf nvtemp
+        mkdir nvtemp
+
+        api_login_url="https://$nv_service_ip:$nv_service_port/v1/auth"
+        login_json="{\"password\":{\"username\":\"$nv_service_login_user\",\"password\":\"$nv_service_login_password\"}}"
+
+        curl --silent --write-out "HTTPSTATUS:%{http_code}" -k -H "Content-Type: application/json" -d "$login_json" $api_login_url > ./nvtemp/tokenResponse
+
+        HTTP_STATUS=$(cat ./nvtemp/tokenResponse | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        if [ "$HTTP_STATUS" == "200" ]; then
+          cat ./nvtemp/tokenResponse | sed -e 's/HTTPSTATUS\:.*//g' > ./nvtemp/token.json
+        elif [ "$HTTP_STATUS" == "401" -o "$HTTP_STATUS" == "404" -o "$HTTP_STATUS" == "405" ]; then
+          echo Invalid credential of NeuVector controller.
+          exit 1
+        else
+          echo Failed to get token. Http status code: $HTTP_STATUS.
+          exit 1
+        fi
+
+        api_scan_url="https://$nv_service_ip:$nv_service_port/v1/scan/scanner"
+        token=$(cat ./nvtemp/token.json | jq -r '.token.token')
+
+        curl --silent --write-out "HTTPSTATUS:%{http_code}" -k -H "Content-Type: application/json" -H "X-Auth-Token:$token" $api_scan_url > ./nvtemp/scannerResponse
+        _status_=$(cat ./nvtemp/scannerResponse | sed -e 's/HTTPSTATUS\:.*//g' | jq .scanners[])
+        _counter_="0"
+        while [ -z "$_status_" -a "$_counter_" != "20" ]; do
+          _counter_=$((( _counter_ + 1 )))
+          sleep 5
+          curl --silent --write-out "HTTPSTATUS:%{http_code}" -k -H "Content-Type: application/json" -H "X-Auth-Token:$token" $api_scan_url > ./nvtemp/scannerResponse
+          _status_=$(cat ./nvtemp/scannerResponse | sed -e 's/HTTPSTATUS\:.*//g' | jq .scanners[])
+        done
+
+        if [ "$_counter_" = "20" ]; then
+          echo Neuvector Scanner is not available.
+          exit 1
+        fi
+
+        api_scan_repo_url="https://$nv_service_ip:$nv_service_port/v1/scan/repository"
+        md_source="gitlab"
+        meta_json="{\"request\":{\"metadata\":{\"source\":\"$md_source\",\"user\":\"\", \"job\":\"\", \"workspace\":\"\"}, \"registry\":\"$image_registry_url\", \"username\":\"$image_registry_user\", \"password\":\"$image_registry_password\", \"repository\":\"$image_repo\", \"tag\":\"$image_tag\", \"scan_layers\":"$scan_layers"}}"
+
+        curl --silent --write-out "HTTPSTATUS:%{http_code}" -k -H "Content-Type:application/json" -H "X-Auth-Token:$token" -d "$meta_json" $api_scan_repo_url > ./nvtemp/scanResponse
+        HTTP_STATUS=$(cat ./nvtemp/scanResponse | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        while [ "$HTTP_STATUS" == "304" ]; do
+          curl --silent --write-out "HTTPSTATUS:%{http_code}" -k -H "Content-Type:application/json" -H "X-Auth-Token:$token" -d "$meta_json" $api_scan_repo_url > ./nvtemp/scanResponse
+          HTTP_STATUS=$(cat ./nvtemp/scanResponse | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        done
+        if [ "$HTTP_STATUS" == "200" ]; then
+          cat ./nvtemp/scanResponse | sed -e 's/HTTPSTATUS\:.*//g' > ./nvreport/scan-repository.json
+          echo Scan successfully.
+        else
+          echo Scan failed. Http status code: $HTTP_STATUS.
+          exit 1
+        fi
+        curl -k -X "DELETE" -H "Content-Type:application/json" -H "X-Auth-Token:$token" $api_login_url
+      fi
+
+    # analyse the scan result
+    - |
+      filename="./nvreport/security-report.csv"
+      labels='"name","score","severity","description","package_name","package_version","fixed_version","link","published_timestamp","last_modified_timestamp"'
+      vars=".name,.score,.severity,.description,.package_name,.package_version,.fixed_version,.link,.published_timestamp,.last_modified_timestamp"
+      query='"report".vulnerabilities[]'
+      #transform and export to csv file - scan report
+      cat ./nvreport/scan-repository.json | jq -r '['$labels'],(.'$query' | ['$vars'])|@csv' > $filename
+    - VUL_NUM=`cat ./nvreport/scan-repository.json | jq '.report.vulnerabilities | length'`
+    - |
+      if [ $VUL_NUM -eq 0 ]; then
+        echo No vulnerabilities found.
+      else
+        echo Total number of vulnerabilities, $VUL_NUM, grouped by package name with vulnerability name.
+        jq '[.report.vulnerabilities | group_by(.package_name) | .[] | {package_name: .[0].package_name, vuln_name: [.[].name]}]' ./nvreport/scan-repository.json
+      fi
+    - FOUND_HIGH=`cat ./nvreport/scan-repository.json | jq '.report.vulnerabilities[] | select(.severity == "High") | .severity' | wc -l`
+    - FOUND_MEDIUM=`cat ./nvreport/scan-repository.json | jq '.report.vulnerabilities[] | select(.severity == "Medium") | .severity' | wc -l`
+    - VUL_LIST=`printf '["%s"]' "${vul_names_to_fail//,/\",\"}"`
+    - VUL_LIST_FOUND=`cat ./nvreport/scan-repository.json | jq --arg arr "$VUL_LIST" '.report.vulnerabilities[] | select(.name as $n | $arr | index($n)) |.name'`
+    - |
+      if [ -z "$VUL_LIST_FOUND" ]; then
+        echo -e "Found High Vulnerabilities = $FOUND_HIGH \nFound Medium Vulnerabilities = $FOUND_MEDIUM \n" > ./nvreport/scan-summary.txt
+      else
+        echo -e "Found specific named vulnerabilities: \n$VUL_LIST_FOUND \n\nHigh Vulnerabilities threshold = $high_vul_to_fail \nFound High Vulnerabilities = $FOUND_HIGH \n\nMedium vulnerabilities threshold = $medium_vul_to_fail\nFound Medium Vulnerabilities = $FOUND_MEDIUM \n" > ./nvreport/scan-summary.txt
+      fi
+    - |
+      if [[ ! -z $VUL_LIST_FOUND ]]; then
+        echo Fail due to found specific named vulnerabilities.
+        scan_fail="true"
+      elif [ $high_vul_to_fail -ne 0 -a $FOUND_HIGH -ge $high_vul_to_fail ]; then
+        echo Fail due to high vulnerabilities found exceeds the criteria.
+        scan_fail="true"
+      elif [ $medium_vul_to_fail -ne 0 -a $FOUND_MEDIUM -ge $medium_vul_to_fail ]; then
+        echo Fail due to medium vulnerabilities found exceeds the criteria.
+        scan_fail="true"
+      else
+        echo Pass the criteria check.
+        scan_fail="false"
+      fi
+    - |
+      if [ $scan_fail == "true" ]; then
+        echo -e "Image scanning failed.\n\n" >> ./nvreport/scan-summary.txt
+        exit 1
+      else
+        echo -e "Image scanning succeed.\n\n" >> ./nvreport/scan-summary.txt
+      fi
+  artifacts:
+    when: always
+    paths:
+      - ./nvreport/scan-summary.txt
+      - ./nvreport/security-report.csv
+      - ./nvreport/scan-repository.json
