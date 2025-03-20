@@ -1,7 +1,4 @@
 neuvector_scan:
-  before_script:
-    - apk add curl
-    - apk add jq
   variables:
     # the flag to run local image scan
     scan_local_image: "false"
