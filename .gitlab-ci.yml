@@ -27,7 +27,6 @@ stages:
 # 构建 Docker 镜像
 build_image:
   stage: build
-  image: docker:20.10
   script:
     - echo "构建 Docker 镜像..."
     - docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile docker/
@@ -63,7 +62,6 @@ neuvector_scan:
 # 推送镜像到 Harbor
 push_image:
   stage: push
-  image: docker:20.10
   script:
     - echo "推送镜像到 Harbor..."
     - mkdir -p ~/.docker
