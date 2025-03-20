@@ -14,18 +14,68 @@ variables:
 # 定义流水线阶段
 stages:
   - build
+  - scan
   - push
 
 # 构建 Docker 镜像
 build_image:
   stage: build
-  image: docker:20.10 # 使用指定版本的 Docker 镜像 
+  image: docker:20.10
   script:
     - echo "构建 Docker 镜像..."
     - docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile docker/
     - docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
   rules:
-    - if: '$CI_COMMIT_TAG' # 只在推送标签时触发
+    - if: '$CI_COMMIT_TAG'
+
+# NeuVector 扫描
+neuvector_scan:
+  stage: scan
+  image: docker:20.10  # 与 build 和 push 使用相同的镜像版本
+  tags:
+    - nv-scan
+  before_script:
+    - apk add curl
+    - apk add jq
+  variables:
+    NV_TO_BE_SCANNED_IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo"
+    NV_TO_BE_SCANNED_IMAGE_TAG: "$CI_COMMIT_TAG"
+    NV_REGISTRY_NAME: "harbor.kodyrepo.online"
+    NV_REGISTRY_USER: "admin"
+    NV_REGISTRY_PASSWORD: "Harbor12345"
+    NV_IMAGE: "docker.io/neuvector/controller"
+    NV_PORT: 10443
+    NV_LOGIN_USER: "admin"
+    NV_LOGIN_PASSWORD: "admin"
+    NV_LOGIN_JSON: '{"password":{"username":"$NV_LOGIN_USER","password":"$NV_LOGIN_PASSWORD"}}'
+    NV_SCANNING_JSON: '{"request":{"registry":"$NV_REGISTRY_NAME","username":"$NV_REGISTRY_USER","password":"$NV_REGISTRY_PASSWORD","repository":"$NV_TO_BE_SCANNED_IMAGE_NAME","tag":"$NV_TO_BE_SCANNED_IMAGE_TAG"}}'
+    NV_API_AUTH_URL: "https://$CI_SERVER_HOST:$NV_PORT/v1/auth"
+    NV_API_SCANNING_URL: "https://$CI_SERVER_HOST:$NV_PORT/v1/scan/repository"
+  script: 
+    - echo "Start neuvector scanner"
+    - docker run -itd --privileged --name neuvector.controller -e CLUSTER_JOIN_ADDR=$CI_SERVER_HOST -p 18301:18301 -p 18301:18301/udp -p 18300:18300 -p 18400:18400 -p $NV_PORT:$NV_PORT -v /var/neuvector:/var/neuvector -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/host/proc:ro -v /sys/fs/cgroup/:/host/cgroup/:ro $NV_IMAGE
+    - |
+      _COUNTER_="0"
+      while [ -z "$TOKEN" -a "$_COUNTER_" != "12" ]; do
+        _COUNTER_=$((( _COUNTER_ + 1 )))
+        sleep 5
+        TOKEN=`(curl -s -f $NV_API_AUTH_URL -k -H "Content-Type:application/json" -d "$NV_LOGIN_JSON" || echo null) | jq -r '.token.token'`
+        if [ "$TOKEN" = "null" ]; then
+          TOKEN=""
+        fi
+      done
+    - echo "Scanning ..."
+    - sleep 20
+    - curl $NV_API_SCANNING_URL -s -k -H "Content-Type:application/json" -H "X-Auth-Token:$TOKEN" -d "$NV_SCANNING_JSON" | jq .
+    - echo "Logout"
+    - curl $NV_API_AUTH_URL -k -X 'DELETE' -H "Content-Type:application/json" -H "X-Auth-Token:$TOKEN"
+  after_script:
+    - docker stop neuvector.controller
+    - docker rm neuvector.controller
+  dependencies:
+    - build_image
+  rules:
+    - if: '$CI_COMMIT_TAG'
 
 # 推送镜像到 Harbor
 push_image:
@@ -40,6 +90,6 @@ push_image:
     - docker push $IMAGE_NAME:latest || { echo "推送 latest 失败"; exit 1; }
     - echo "镜像推送完成"
   dependencies:
-    - build_image # 依赖构建阶段
+    - neuvector_scan
   rules:
-    - if: '$CI_COMMIT_TAG' # 只在推送标签时触发
+    - if: '$CI_COMMIT_TAG'
