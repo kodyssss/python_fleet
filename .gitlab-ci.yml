@@ -1,7 +1,8 @@
 # 全局变量
 variables:
   IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo" # 自定义镜像名称 
-  IMAGE_TAG: "$CI_COMMIT_TAG" # 使用提交的短 SHA 作为标签
+  #IMAGE_TAG: "$CI_COMMIT_TAG" # 使用提交的短 SHA 作为标签
+  IMAGE_TAG: "test"
   DOCKER_AUTH_CONFIG: | # Docker 认证配置，用于登录 Harbor
     {
       "auths": {
