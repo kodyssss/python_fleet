@@ -5,7 +5,7 @@ include:
 # 全局变量
 variables:
   IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo"
-  IMAGE_TAG: "$CI_COMMIT_TAG"
+  IMAGE_TAG: "test"
   DOCKER_AUTH_CONFIG: |
     {
       "auths": {
@@ -37,8 +37,8 @@ build_image:
     expire_in: 1 hour
     paths:
       - temp.tar
-  rules:
-    - if: '$CI_COMMIT_TAG'
+  #rules:
+  #  - if: '$CI_COMMIT_TAG'
 
 # NeuVector 扫描
 neuvector_scan:
@@ -56,8 +56,8 @@ neuvector_scan:
     vul_names_to_fail: "CVE-2020-1971, CVE-2020-1972" # 指定失败的 CVE
   dependencies:
     - build_image                    # 依赖构建阶段的 tar 文件
-  rules:
-    - if: '$CI_COMMIT_TAG'
+  #rules:
+  #  - if: '$CI_COMMIT_TAG'
 
 # 推送镜像到 Harbor
 push_image:
@@ -73,5 +73,5 @@ push_image:
     - echo "镜像推送完成"
   dependencies:
     - neuvector_scan                 # 依赖扫描阶段
-  rules:
-    - if: '$CI_COMMIT_TAG'
+  #rules:
+  #  - if: '$CI_COMMIT_TAG'
