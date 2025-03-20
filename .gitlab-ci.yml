@@ -6,9 +6,6 @@ stages:
  - test_job
 
 build-image_job:
-  image: docker:latest
-  services:
-    - docker:dind
   stage: build_job
   script:
     - docker info
