@@ -1,6 +1,4 @@
 neuvector_scan:
-  services:
-    - docker:dind
   before_script:
     - apk add curl
     - apk add jq
