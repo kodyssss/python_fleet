@@ -6,7 +6,7 @@ variables:
     {
       "auths": {
         "harbor.kodyrepo.online": {
-          "auth": "S29keTpQQHNzd3IwZA=="
+          "auth": "YWRtaW46SGFyYm9yMTIzNDU="
         }
       }
     }
