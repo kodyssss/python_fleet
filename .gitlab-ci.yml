@@ -46,7 +46,9 @@ neuvector_scan:
     scan_local_image: "true"          # 扫描本地 tar 文件
     image_tar: "temp.tar"             # 构建阶段导出的 tar 文件
     image_repo: "$IMAGE_NAME"         # 镜像名称
-    image_tag: "$IMAGE_TAG"           # 镜像标签
+    image_tag: "$IMAGE_TAG"
+    nv_registry_url: "harbor.kodyrepo.online"
+    nv_scanner_image: "harbor.kodyrepo.online/library/neuvector-scanner:latest"    # 镜像标签
     nv_registry_user: "$NV_REGISTRY_USER"      # Harbor 用户名
     nv_registry_password: "$NV_REGISTRY_PASSWORD" # Harbor 密码
     scan_layers: "false"              # 是否扫描镜像层（关闭以加快速度）
