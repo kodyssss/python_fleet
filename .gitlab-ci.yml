@@ -1,37 +1,80 @@
+# 引入 NeuVector GitLab 插件
 include:
- - "scan.yml"
+  - 'scan.yml'
 
+# 全局变量
+variables:
+  IMAGE_REGI_URL: "harbor.kodyrepo.online"
+  IMAGE_REPO: "library"
+  IMAGE_NAME: "flask-demo"
+  IMAGE_TAG: "test"
+  DOCKER_AUTH_CONFIG: |
+    {
+      "auths": {
+        "harbor.kodyrepo.online": {
+          "auth": "YWRtaW46SGFyYm9yMTIzNDU="
+        }
+      }
+    }
+  NV_REGISTRY_USER: "admin"           # Harbor 用户名
+  NV_REGISTRY_PASSWORD: "Harbor12345" # Harbor 密码
+
+# 定义流水线阶段
 stages:
- - build_job
- - test_job
+  - build
+  - scan
+  - push
 
-build-image_job:
-  stage: build_job
+# 构建 Docker 镜像
+build_image:
+  stage: build
   script:
-    - docker info
-    - docker pull alpine:3.3
-    - docker tag alpine:3.3 demo:1.0
+    - echo "构建 Docker 镜像..."
+    - docker build -t $IMAGE_REGI_URL/$IMAGE_REPO/$IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile docker/
     # archive a running container to a tar file for scanning
-    - docker save -o temp.tar demo:1.0
+    - docker save -o temp.tar $IMAGE_REGI_URL/$IMAGE_REPO/$IMAGE_NAME:$IMAGE_TAG
   artifacts:
-    expire_in: 1 hours
+    expire_in: 1 hour
     paths:
       - temp.tar
-  
+  #rules:
+  #  - if: '$CI_COMMIT_TAG'
+
+# NeuVector 扫描
 neuvector_scan:
-  stage: test_job
+  stage: scan
   variables:
-    nv_registry_user: admin
-    nv_registry_password: Harbor12345
     scan_local_image: "true"
     image_tar: "temp.tar"
-    image_repo: "demo"
-    image_tag: "1.0"
+    image_registry_url: "https://harbor.kodyrepo.online"
+    image_registry_user: "$NV_REGISTRY_USER"
+    image_registry_password: "$NV_REGISTRY_PASSWORD"
+    image_repo: "$IMAGE_REPO/$IMAGE_NAME"
+    image_tag: "$IMAGE_TAG"
     nv_registry_url: "harbor.kodyrepo.online"
-    nv_scanner_image: "harbor.kodyrepo.online/library/neuvector-scanner:latest"
-    nv_registry_user: admin
-    nv_registry_password: Harbor12345
-    scan_layers: "false"
-    high_vul_to_fail: 9
-    medium_vul_to_fail: 10
-    vul_names_to_fail: "CVE-2020-1971, CVE-2020-1972"
+    nv_scanner_image: "harbor.kodyrepo.online/library/neuvector-scanner:latest"    # 镜像标签
+    nv_registry_user: "$NV_REGISTRY_USER"      # Harbor 用户名
+    nv_registry_password: "$NV_REGISTRY_PASSWORD" # Harbor 密码
+    scan_layers: "false"              # 是否扫描镜像层（关闭以加快速度）
+    high_vul_to_fail: 9               # 高危漏洞阈值，超过 9 个失败
+    medium_vul_to_fail: 10            # 中危漏洞阈值，超过 10 个失败
+    vul_names_to_fail: "CVE-2020-1971, CVE-2020-1972" # 指定失败的 CVE
+  dependencies:
+    - build_image                    # 依赖构建阶段的 tar 文件
+  #rules:
+  #  - if: '$CI_COMMIT_TAG'
+
+# 推送镜像到 Harbor
+push_image:
+  stage: push
+  script:
+    - echo "推送镜像到 Harbor..."
+    - mkdir -p ~/.docker
+    - echo "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json || { echo "写入 Docker 配置失败"; exit 1; }
+    - ping -c 4 harbor.kodyrepo.online || { echo "无法连接 harbor.kodyrepo.online"; exit 1; }
+    - docker push $IMAGE_REGI_URL/$IMAGE_REPO/$IMAGE_NAME:$IMAGE_TAG || { echo "推送 $IMAGE_TAG 失败"; exit 1; }
+    - echo "镜像推送完成"
+  dependencies:
+    - neuvector_scan                 # 依赖扫描阶段
+  #rules:
+  #  - if: '$CI_COMMIT_TAG'
