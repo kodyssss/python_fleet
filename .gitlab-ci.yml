@@ -1,5 +1,5 @@
 include:
- - remote: 'https://gitlab.com/neuvector/gitlab-plugin/-/raw/master/scan.yml'
+ - "scan.yml"
 
 stages:
  - build_job
