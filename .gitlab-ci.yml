@@ -1,5 +1,4 @@
 # 引入 NeuVector GitLab 插件
-
 include:
   - 'scan.yml'
 
