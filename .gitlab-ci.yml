@@ -1,6 +1,7 @@
 # 引入 NeuVector GitLab 插件
+
 include:
-  - remote: 'https://gitlab.com/neuvector/gitlab-plugin/-/raw/master/scan.yml'
+  - 'scan.yml'
 
 # 全局变量
 variables:
