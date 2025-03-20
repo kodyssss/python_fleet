@@ -50,8 +50,8 @@ neuvector_scan:
     NV_LOGIN_PASSWORD: "admin"
     NV_LOGIN_JSON: '{"password":{"username":"$NV_LOGIN_USER","password":"$NV_LOGIN_PASSWORD"}}'
     NV_SCANNING_JSON: '{"request":{"registry":"$NV_REGISTRY_NAME","username":"$NV_REGISTRY_USER","password":"$NV_REGISTRY_PASSWORD","repository":"$NV_TO_BE_SCANNED_IMAGE_NAME","tag":"$NV_TO_BE_SCANNED_IMAGE_TAG"}}'
-    NV_API_AUTH_URL: "https://$CI_SERVER_HOST:$NV_PORT/v1/auth"
-    NV_API_SCANNING_URL: "https://$CI_SERVER_HOST:$NV_PORT/v1/scan/repository"
+    NV_API_AUTH_URL: "https://10.128.1.76:$NV_PORT/v1/auth"
+    NV_API_SCANNING_URL: "https://10.128.1.76:$NV_PORT/v1/scan/repository"
   script: 
     - echo "Start neuvector scanner"
     - docker run -itd --privileged --name neuvector.controller -e CLUSTER_JOIN_ADDR=$CI_SERVER_HOST -p 18301:18301 -p 18301:18301/udp -p 18300:18300 -p 18400:18400 -p $NV_PORT:$NV_PORT -v /var/neuvector:/var/neuvector -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/host/proc:ro -v /sys/fs/cgroup/:/host/cgroup/:ro $NV_IMAGE
