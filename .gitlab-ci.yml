@@ -4,7 +4,9 @@ include:
 
 # 全局变量
 variables:
-  IMAGE_NAME: "harbor.kodyrepo.online/library/flask-demo"
+  IMAGE_REGI_URL: "harbor.kodyrepo.online"
+  IMAGE_REPO: "library"
+  IMAGE_NAME: "flask-demo"
   IMAGE_TAG: "test"
   DOCKER_AUTH_CONFIG: |
     {
@@ -29,13 +31,7 @@ build_image:
   script:
     - echo "构建 Docker 镜像..."
     - docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/dockerfile docker/
-    - docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
-    # 导出镜像为 tar 文件供扫描使用
-    - docker save -o temp.tar $IMAGE_NAME:$IMAGE_TAG
-  artifacts:
-    expire_in: 1 hour
-    paths:
-      - temp.tar
+    - docker tag $IMAGE_REGI_URL/$IMAGE_REPO/$IMAGE_NAME:$IMAGE_TAG
   #rules:
   #  - if: '$CI_COMMIT_TAG'
 
@@ -43,9 +39,10 @@ build_image:
 neuvector_scan:
   stage: scan
   variables:
-    scan_local_image: "true"          # 扫描本地 tar 文件
-    image_tar: "temp.tar"             # 构建阶段导出的 tar 文件
-    image_repo: "$IMAGE_NAME"         # 镜像名称
+    image_registry_url: "https://harbor.kodyrepo.online"
+    image_registry_user: "$NV_REGISTRY_USER"
+    image_registry_password: "$NV_REGISTRY_PASSWORD"
+    image_repo: "$IMAGE_REPO/$IMAGE_NAME"
     image_tag: "$IMAGE_TAG"
     nv_registry_url: "harbor.kodyrepo.online"
     nv_scanner_image: "harbor.kodyrepo.online/library/neuvector-scanner:latest"    # 镜像标签
@@ -68,8 +65,7 @@ push_image:
     - mkdir -p ~/.docker
     - echo "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json || { echo "写入 Docker 配置失败"; exit 1; }
     - ping -c 4 harbor.kodyrepo.online || { echo "无法连接 harbor.kodyrepo.online"; exit 1; }
-    - docker push $IMAGE_NAME:$IMAGE_TAG || { echo "推送 $IMAGE_TAG 失败"; exit 1; }
-    - docker push $IMAGE_NAME:latest || { echo "推送 latest 失败"; exit 1; }
+    - docker push $IMAGE_REGI_URL/$IMAGE_REPO/$IMAGE_NAME:$IMAGE_TAG || { echo "推送 $IMAGE_TAG 失败"; exit 1; }
     - echo "镜像推送完成"
   dependencies:
     - neuvector_scan                 # 依赖扫描阶段
