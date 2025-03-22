@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: suse-webui-demo-service
+  labels:
+    app: suse-webui-demo
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5001
+    targetPort: 5001
+    protocol: TCP
+  selector:
+    app: suse-webui-demo

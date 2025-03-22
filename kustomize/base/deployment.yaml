@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: suse-webui-demo
+  labels:
+    app: suse-webui-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: suse-webui-demo
+  template:
+    metadata:
+      labels:
+        app: suse-webui-demo
+    spec:
+      containers:
+      - name: suse-webui-demo
+        image: harbor.kodyrepo.online/library/suse-webui-demo:v1.0.1
+        ports:
+        - containerPort: 5001
