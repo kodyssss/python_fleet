@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
 - deployment.yaml
 - service.yaml
+- ingress.yaml
 images:
 - name: harbor.kodyrepo.online/library/suse-webui-demo
   newTag: v1.0.1  # 初始版本
