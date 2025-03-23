@@ -81,6 +81,7 @@ push_image:
   rules:
     - if: '$CI_COMMIT_TAG'
 
+# 更新 Fleet 部署配置（修改 kustomization.yaml）
 update_fleet:
   stage: deploy
   script:
@@ -102,12 +103,9 @@ update_fleet:
       EOF
     - git add kustomization.yaml
     - git commit -m "Update kustomization.yaml to $CI_COMMIT_TAG" || echo "No changes to commit"
-    - echo "$CI_SERVER_HOST/$CI_PROJECT_PATH"
-    - git push https://root:P@sswr0d@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:$CI_DEFAULT_BRANCH || { echo "Git push 失败"; exit 1; }
+    - git push https://$GITLAB_USER:$GITLAB_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:$CI_DEFAULT_BRANCH || { echo "Git push 失败"; exit 1; }
     - echo "Fleet 配置更新完成"
   dependencies:
     - push_image
   rules:
     - if: '$CI_COMMIT_TAG'
-
-
