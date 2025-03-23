@@ -17,6 +17,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: suse-webui-demo
+                name: suse-webui-demo-service
                 port:
                   number: 443
