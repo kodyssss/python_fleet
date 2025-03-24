@@ -6,4 +6,4 @@ resources:
 - ingress.yaml
 images:
 - name: harbor.kodyrepo.online/library/suse-webui-demo
-  newTag: v1.0.8  # 动态更新为 CI_COMMIT_TAG
+  newTag: v1.1  # 动态更新为 CI_COMMIT_TAG
