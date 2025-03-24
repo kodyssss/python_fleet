@@ -50,7 +50,7 @@ neuvector_scan:
     image_registry_url: "https://harbor.kodyrepo.online"
     image_registry_user: "$NV_REGISTRY_USER"
     image_registry_password: "$NV_REGISTRY_PASSWORD"
-    image_repo: "$IMAGE_REPO/$IMAGE_NAME"
+    image_repo: "harbor.kodyrepo.online/$IMAGE_REPO/$IMAGE_NAME"
     image_tag: "$IMAGE_TAG"
     nv_registry_url: "harbor.kodyrepo.online"
     nv_scanner_image: "harbor.kodyrepo.online/library/neuvector-scanner:latest"    # 镜像标签
