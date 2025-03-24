@@ -7,7 +7,7 @@ app = Flask(__name__)
 STATIC_DIR = 'static'
 
 # 读取版本号
-VERSION = "v1.1"
+VERSION = "v1.2"
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
