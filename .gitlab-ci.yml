@@ -1,0 +1,19 @@
+include:
+ - local: 'scan.yaml'
+  
+neuvector_scan:
+  variables:
+    image_registry_url: "https://harbor.kody.com"
+    image_registry_user: "admin"
+    image_registry_password: "Harbor12345"
+    image_repo: "hangar-helm"
+    image_tag: "2.12.2-ent"
+    nv_service_ip: ""
+    nv_service_port: ""
+    nv_service_login_user: $NV_SERVICE_LOGIN_USER
+    nv_service_login_password: $NV_SERVICE_LOGIN_PASSWORD
+    scan_layers: "false"
+    high_vul_to_fail: 10
+    medium_vul_to_fail: 9
+    vul_names_to_fail: "CVE-2020-1971, CVE-2020-1972"
+

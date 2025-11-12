@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-demo
+spec:
+  selector:
+    matchLabels:
+      app: python-demo
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: python-demo
+    spec:
+      containers:
+      - name: python-demo
+        image: registry.cn-shanghai.aliyuncs.com/kody_poc/fleet-python.demo:1.0.0 # {"$imagescan": "python-demo-scan"}
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
