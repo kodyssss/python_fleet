@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  # Ingress 资源名称，需在 default 命名空间内唯一
+  name: python-demo-ingress
+  # 与 Service 保持同一命名空间（default）
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  # 路由规则（核心）
+  rules:
+  # 规则1：通过自定义域名访问（需提前将域名解析到 Ingress Controller 节点 IP）
+  - host: python-demo.example.com  # 替换为你的实际访问域名（如无域名可注释此行为 IP 访问）
+    http:
+      paths:
+      # 路径匹配：根路径 "/" 转发到后端服务
+      - path: /
+        # 路径匹配类型：Prefix 表示前缀匹配（推荐）
+        pathType: Prefix
+        backend:
+          # 关联你创建的 python-demo Service
+          service:
+            # Service 名称（与 svc.yaml 中一致）
+            name: python-demo
+            # Service 暴露的端口（与 svc.yaml 中 port 字段一致，填 5000 而非 nodePort 30500）
+            port:
+              number: 5000
+  # 规则2（可选）：无域名访问（直接通过 Ingress Controller 节点 IP 访问）
+  # 若无需域名，可删除上面的 host 规则，保留以下无 host 规则
+  # - http:
+  #     paths:
+  #     - path: /
+  #       pathType: Prefix
+  #       backend:
+  #         service:
+  #           name: python-demo
+  #           port:
+  #             number: 5000
