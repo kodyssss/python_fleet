@@ -1,86 +1,194 @@
-# python_fleet DevSecOps 项目 README
+# python_fleet
 
-## 项目概述
-本项目是一个结合 **Fleet 设备管理**、**GitLab CI 自动化流水线**与 **NEU 安全扫描**的 DevSecOps 实践项目，旨在通过自动化流程实现代码开发、安全检测与设备管理的一体化，提升软件交付的安全性与效率。
+一个基于 **GitLab CI + Fleet 设备管理 + NEU 安全扫描 + Python Web 应用** 的 DevSecOps Demo 项目。
 
-
-## 技术栈
-- **版本控制与 CI/CD**：GitLab
-- **设备管理**：Fleet
-- **安全扫描**：NEU 扫描工具
-- **应用开发**：Python
-- **容器化**：Docker
-
-
-## 项目结构
-```
-python_fleet/
-├── kustomize/          # Kustomize 配置目录（用于 Kubernetes 资源定制）
-├── static/             # 静态资源目录
-├── templates/          # 模板文件目录（如 Kubernetes 资源模板）
-├── .gitlab-ci.yml      # GitLab CI 流水线配置文件
-├── demo_web.py         # Python 示例 Web 应用
-├── dockerfile          # Docker 镜像构建文件
-├── scan.yaml           # NEU 安全扫描配置文件
-└── README.md           # 本说明文件
-```
-
-
-## 功能说明
-1. **GitLab CI 自动化流水线**
-   通过 `.gitlab-ci.yml` 定义自动化流程，包含**代码编译、NEU 安全扫描、Docker 镜像构建、Fleet 设备同步**等环节，实现从代码提交到安全交付的全自动化。
-
-2. **NEU 安全扫描**
-   基于 `scan.yaml` 配置，对代码、依赖、容器镜像等进行**漏洞检测、合规性检查**，确保代码安全性。
-
-3. **Fleet 设备管理集成**
-   实现与 Fleet 平台的对接，支持**设备状态监控、配置下发、安全策略同步**，保障终端设备的合规性。
-
-4. **Python 示例应用**
-   `demo_web.py` 提供简单 Web 服务示例，展示应用开发与容器化部署流程。
-
-
-## 快速开始
-
-### 前提条件
-- 拥有 GitLab 项目仓库权限
-- 已部署 Fleet 平台并配置访问凭证
-- 已接入 NEU 扫描服务
-
-
-### 步骤 1：克隆项目
-```bash
-git clone <项目Git地址>
-cd python_fleet
-```
-
-### 步骤 2：配置 GitLab CI
-修改 `.gitlab-ci.yml` 中的**环境变量、服务地址**（如 Fleet 地址、NEU 扫描服务地址），适配你的环境。
-
-### 步骤 3：触发 CI 流水线
-提交代码至 GitLab 仓库，自动触发 CI 流水线：
-```bash
-git add .
-git commit -m "Initial commit"
-git push origin main
-```
-
-### 步骤 4：查看流水线与扫描结果
-在 GitLab 项目的 **CI/CD -> 流水线** 中查看执行过程，在 **作业日志** 中查看 NEU 扫描报告与 Fleet 同步状态。
-
-
-## 贡献指南
-欢迎通过以下方式参与项目：
-- 提交 Issue 反馈 bug 或提出功能建议
-- 提交 Pull Request 贡献代码（请遵循代码规范与提交说明）
-
-
-## 联系与支持
-若有任何疑问，可通过以下方式联系：
-- 邮件：[你的邮箱]
-- GitLab 项目 Issue 板块
-
+本项目演示如何在企业环境中，通过自动化流水线实现 **代码开发 → 安全扫描 → 构建镜像 → Fleet 设备配置同步** 的 DevSecOps 全流程。
 
 ---
 
-通过本项目，你可以快速实践 DevSecOps 理念，将安全左移融入开发流程，同时结合设备管理实现端到端的合规性保障。
+## 📌 项目概述
+
+`python_fleet` 是一个面向企业内部安全与终端管理场景设计的 Demo 项目。
+通过 GitLab CI/CD、NEU 安全扫描服务和 Fleet 设备管理平台，构建了一个安全高效的 DevSecOps 流程。
+
+该项目包含：
+
+* Python 示例 Web 服务
+* Docker 镜像构建流程
+* 自动化安全扫描（NEU）
+* 与 Fleet 的对接（配置下发 / 设备同步）
+* 完整 GitLab CI 配置
+* Kubernetes 部署示例（由 Kustomize 模板管理）
+
+---
+
+## 🏗️ 整体架构（DevSecOps 流程）
+
+```
+开发者提交代码 ───────────────┐
+                               ▼
+                      GitLab CI Pipeline
+ ┌──────────────────────────────────────────────────────────┐
+ │ 1. 代码检查 / Lint                                       │
+ │ 2. NEU 代码依赖 / 容器扫描 (scan.yaml)                   │
+ │ 3. 构建 Python Web Docker 镜像                          │
+ │ 4. 推送镜像到 Registry（可选，无 Harbor 依赖）           │
+ │ 5. 触发 Fleet 配置同步 / 应用交付                        │
+ └──────────────────────────────────────────────────────────┘
+                               ▼
+                       Fleet 设备管理平台
+                               ▼
+                   设备拉取配置 → 部署安全策略
+```
+
+---
+
+## 🔧 技术栈
+
+| 组件               | 用途                                   |
+| ---------------- | ------------------------------------ |
+| **Python**       | 示例 Web 服务 demo_web.py                |
+| **Docker**       | 应用镜像构建                               |
+| **GitLab CI/CD** | 自动化流水线执行                             |
+| **Fleet**        | 设备管理 / 配置同步                          |
+| **NEU 扫描工具**     | 安全扫描（SAST / Dependency / Image Scan） |
+| **Kustomize**    | Kubernetes 配置模板                      |
+
+---
+
+## 📁 项目结构
+
+```
+python_fleet/
+├── kustomize/          # Kubernetes 部署模板（用于 Fleet 或 K8s 集群）
+├── static/             # 静态资源
+├── templates/          # 示例模板文件
+├── demo_web.py         # Python 示例 Web 服务
+├── dockerfile          # Docker 镜像构建定义
+├── scan.yaml           # NEU 扫描配置文件
+├── .gitlab-ci.yml      # GitLab CI 流水线配置
+└── README.md           # 项目说明文档
+```
+
+---
+
+## 🚀 快速开始
+
+### 前置条件
+
+* 具有 GitLab 项目权限
+* 已连接 NEU 安全扫描服务
+* 已部署 Fleet 平台（并具备 API Token 或访问凭证）
+* Docker 环境（本地构建时需要）
+
+---
+
+## 🔨 本地运行 Python Web Demo
+
+```bash
+pip install flask
+python demo_web.py
+```
+
+应用将默认在 `http://127.0.0.1:5000` 提供简单 Web 服务。
+
+---
+
+## 🐳 构建 Docker 镜像
+
+```bash
+docker build -t python_fleet_demo:latest .
+```
+
+如需运行：
+
+```bash
+docker run -p 5000:5000 python_fleet_demo
+```
+
+---
+
+## 🛠 GitLab CI 流水线（.gitlab-ci.yml）
+
+流水线阶段说明：
+
+| Stage      | 步骤           | 说明                             |
+| ---------- | ------------ | ------------------------------ |
+| **lint**   | 代码检查         | 可扩展 flake8/Pylint              |
+| **scan**   | NEU 安全扫描     | 使用 `scan.yaml` 配置 SAST/依赖/镜像扫描 |
+| **build**  | 构建镜像         | 使用 Docker 构建 demo 应用           |
+| **deploy** | Fleet 同步（可选） | 推送配置或触发设备策略同步                  |
+
+你可根据企业内部 Registry / Fleet 接入方式，修改 `.gitlab-ci.yml` 中相关变量：
+
+```yaml
+FLEET_URL: "http://your-fleet-server"
+NEU_SCAN_URL: "http://neu-scan-server"
+```
+
+---
+
+## 🔍 NEU 安全扫描（scan.yaml）
+
+`scan.yaml` 用于配置：
+
+* 代码静态扫描（SAST）
+* 依赖漏洞扫描
+* Docker 镜像漏洞扫描
+* 合规性检查（如 CIS 检查）
+
+CI 中自动执行扫描并在作业日志中显示结果。
+
+---
+
+## 🖥️ Fleet 集成说明
+
+本项目支持：
+
+✔ 自动触发 Fleet 配置同步
+✔ 扫描合规后再推送配置（Shift Left）
+✔ 终端设备自动拉取最新策略 / 配置
+
+可根据你的实际 Fleet 平台替换：
+
+* API 地址
+* 设备组
+* 策略模板
+
+---
+
+## 📦 Kubernetes 部署（可选）
+
+使用 `kustomize/` 中的模板：
+
+```bash
+kubectl apply -k kustomize/
+```
+
+这将部署 python_fleet Demo Web 服务（可与 Fleet / CI/CD 流程联动）。
+
+---
+
+## 🤝 贡献方式
+
+欢迎参与项目改进：
+
+* 提交 Issue
+* 提交 PR（建议保持一致的代码风格）
+* 优化 CI 流程 / 扩展安全扫描规则
+
+---
+
+## 📬 联系方式
+
+如需协助或咨询：974177019@qq.com
+
+* 邮箱：请在此填入你的邮箱
+* GitLab 项目 Issue 讨论区
+
+---
+
+## 📝 License
+
+本项目仅用于学习与演示 DevSecOps 流程，不用于生产环境。
+可以自由 Fork / 修改 / 内部使用。
