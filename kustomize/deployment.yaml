@@ -16,7 +16,7 @@ spec:
       - name: python-demo
         image: registry.cn-shanghai.aliyuncs.com/kody_poc/fleet-python.demo:1.0.0 # {"$imagescan": "python-demo-scan"}
         ports:
-        - containerPort: 8000
+        - containerPort: 5000
         resources:
           requests:
             cpu: 100m
